@@ -163,6 +163,37 @@ local function in_safe_zone(pos)
 	return true
 end
 
+local function hud_string(inmate)
+	return 'Time Served: ' ..
+		tostring(round(inmate.time_served)) .. '/' ..
+		tostring(round(inmate.sentence)) .. '(s)'
+end
+
+local function add_hud(inmate)
+	local player = core.get_player_by_name(inmate.name)
+	local def = hud_def
+	def.text = hud_string(inmate)
+	hud_ids[inmate.name] = player:hud_add(def)
+end
+
+local function drop_hud(inmate)
+	local player = core.get_player_by_name(inmate.name)
+	player:hud_remove(hud_ids[inmate.name])
+	hud_ids[inmate.name] = nil
+end
+
+local function update_hud(inmate)
+	if hud_ids[inmate.name] then
+		local player = core.get_player_by_name(inmate.name)
+		--player:hud_change(tonumber(hud_ids[inmate.name]), 'text', status)
+		player:hud_change(hud_ids[inmate.name], 'text', hud_string(inmate))
+	else
+		core.log('warning','Justice mod missing hud id for player ' ..
+			inmate.name .. '.')
+		add_hud(inmate)
+	end
+end
+
 local function revoke(name)
 	local privs = core.get_player_privs(name)
 	if not privs then 
@@ -206,11 +237,7 @@ local function confine(inmate)
 	cell.occupied = true
 	player:setpos(cell.pos)
 
-	local def = hud_def
-	def.text = 'Time Served: ' ..
-		tostring(round(inmate.time_served)) .. '/' ..
-		tostring(round(inmate.sentence)) .. '(s)'
-	hud_ids[inmate.name] = player:hud_add(def)
+	add_hud(inmate)
 
 	core.sound_play("teleport", {
 		to_player = inmate.name,
@@ -231,8 +258,7 @@ local function release(inmate)
 	cells[inmate.cell_number].occupied = false
 	player:setpos(find_free_pos_near(release_pos))
 
-	player:hud_remove(hud_ids[inmate.name])
-	hud_ids[inmate.name] = nil
+	drop_hud(inmate)
 
 	core.sound_play("teleport", {
 		to_player = inmate.name,
@@ -396,6 +422,8 @@ core.register_on_leaveplayer(function(player)
 		data.inmates.inactive[name] = inmate
 		data.inmates.active[name]   = nil
 		write_data_file()
+
+		drop_hud(inmate)
 	end
 end)
 
@@ -414,26 +442,10 @@ core.register_on_joinplayer(function(player)
 		data.inmates.active[name]   = inmate
 		data.inmates.inactive[name] = nil
 		write_data_file()
+
+		add_hud(inmate)
 	end
 end)
-
-local function update_hud(inmate)
-	local player = core.get_player_by_name(inmate.name)
-	local status = 'Time Served: ' ..
-		tostring(round(inmate.time_served)) .. '/' ..
-		tostring(round(inmate.sentence)) .. '(s)'
-
-	if hud_ids[inmate.name] then
-		player:hud_change(tonumber(hud_ids[inmate.name]), 'text', status)
-	else
-		core.log('warning','Justice mod missing hud id for player ' ..
-			inmate.name .. '.')
-
-		local def = hud_def
-		def.text = status
-		hud_ids[inmate.name] = player:hud_add(def)
-	end
-end
 
 -- Track time served for active (logged-in) inmates.
 local time = 0
