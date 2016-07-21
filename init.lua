@@ -14,27 +14,27 @@ local safe_zones = {}
 local pvp_zones = {
 	{x_min = 524, x_max = 602, y_min = 0, y_max = 76, z_min = 349, z_max = 468}
 }
-local release_pos = {x = 0, y = 22, z = 0}
+local release_pos = {x = 117, y = 2, z = -19}
 local cells = {
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
+	--{pos = {x = -5, y = 21, z = -4}, occupied = false},
 
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
+	{pos = {x = 139, y = 2, z = -17}, occupied = false},
+	{pos = {x = 139, y = 2, z = -25}, occupied = false},
+	{pos = {x = 135, y = 2, z = -17}, occupied = false},
+	{pos = {x = 135, y = 2, z = -25}, occupied = false},
+	{pos = {x = 131, y = 2, z = -17}, occupied = false},
+	{pos = {x = 131, y = 2, z = -25}, occupied = false},
+	{pos = {x = 127, y = 2, z = -17}, occupied = false},
+	{pos = {x = 127, y = 2, z = -25}, occupied = false},
 
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
-	{pos = {x = -5, y = 21, z = -4}, occupied = false},
+	{pos = {x = 139, y = 7, z = -17}, occupied = false},
+	{pos = {x = 139, y = 7, z = -25}, occupied = false},
+	{pos = {x = 135, y = 7, z = -17}, occupied = false},
+	{pos = {x = 135, y = 7, z = -25}, occupied = false},
+	{pos = {x = 131, y = 7, z = -17}, occupied = false},
+	{pos = {x = 131, y = 7, z = -25}, occupied = false},
+	{pos = {x = 127, y = 7, z = -17}, occupied = false},
+	{pos = {x = 127, y = 7, z = -25}, occupied = false},
 }
 
 local hud_ids = {}
@@ -75,6 +75,7 @@ end
 
 -- Save the data when the server shutdown.
 core.register_on_shutdown(function()
+	-- TODO deactivate players
 	write_data_file()
 end)
 
@@ -85,15 +86,15 @@ data.inmates.active   = data.inmates.active   or {}
 data.inmates.inactive = data.inmates.inactive or {}
 
 -- There are no logged in players when the server starts, so deactivate all
--- inmates when the server first starts up. This should have been handled during
+-- inmates when the server first starts up. This should be been handled during
 -- shutdown, but the server may have not have stopped gracefully.
-for _,inmate in ipairs(data.inmates.active) do
-	table.insert(data.inmates.inactive, {
-		player_name = inmate.player_name,
+for name,inmate in pairs(data.inmates.active) do
+	data.inmates.inactive[name] = {
+		name = inmate.name,
 		sentence    = inmate.sentence or 60,
 		time_served = inmate.time_served or 0,
 		--cell_number = nil, -- does nothing
-	})
+	}
 end
 data.inmates.active = {}
 write_data_file()
@@ -104,11 +105,11 @@ write_data_file()
 ----------------------
 
 local function round(number)
-	-- Round numbers to the nearest integer. Numbers exactly between 
+	-- Round numbers to the nearest integer. Numbers exactly between
 	-- two integers (ending in .5) are rounded away from zero.
 	if number >= 0.5 then
 		return math.floor(number + 0.5)
-	else 
+	else
 		return math.ceil(number - 0.5)
 	end
 end
@@ -196,7 +197,7 @@ end
 
 local function revoke(name)
 	local privs = core.get_player_privs(name)
-	if not privs then 
+	if not privs then
 		core.log('warning', 'Unable to revoke ' .. name .. '\'s privileges.')
 		return false
 	end
@@ -275,49 +276,53 @@ end
 justice = {}
 
 function justice.sentence(judge, player_name, seconds, cause)
+	-- Update the players criminal record.
 	local record = {
-		date = os.date('%Y:%m:%d %X'),
+		date = os.date('%Y-%m-%d %X'),
 		judge = judge,
 		duration = seconds,
 		cause = cause,
 	}
-	local inmate = {
-		name = player_name,
-		sentence = seconds,
-		time_served = 0,
-	}
-
-	if confine(inmate) and revoke(inmate.name) then
-		if not data.records[inmate.name] then
-			data.records[inmate.name] = {}
-		end
-		table.insert(data.records[inmate.name], record)
-
-		if not data.inmates.active[inmate.name] then
-			data.inmates.active[inmate.name] = {}
-		end
-		data.inmates.active[inmate.name] = inmate
-
-		write_data_file()
-
-		core.log('action', judge .. ' sentenced ' .. inmate.name .. ' to ' ..
-			tostring(seconds) .. ' seconds in prison for ' .. cause .. '.')
-		core.chat_send_all(inmate.name ..	' has been found guilty of ' .. cause ..
-			' and has been sentenced to prison for ' .. tostring(seconds) ..
-			' seconds.')
-		local formspec = 'size[8,9]'..
-			'textarea[0.3,0.25;8,9;court;= The Court of FozLand =;'..
-			'\nYou have been tried and found you guilty of ' .. cause .. '. \n\n' ..
-			'You are hereby sentenced to prison for ' .. tostring(seconds) .. 
-			' seconds. \n\nYour privileges have been reduced while you serve your ' ..
-			' sentence. Please review the rules at /news if you have any questions]'..
-			'button_exit[5.5,8.4;2.5,1;exit;I Understand]'
-		core.show_formspec(inmate.name, "Conviction", formspec)
-	else
-		local notice = 'Sentencing ' .. player_name .. ' failed.'
-		core.chat_send_player(judge, notice)
-		core.log('warning', notice)
+	if not data.records[player_name] then
+		data.records[player_name] = {}
 	end
+	table.insert(data.records[player_name], record)
+
+	-- Update the players sentence, confine and revoke as necessary.
+	local inmate = {}
+	if data.inmates.active[player_name] then
+		inmate = data.inmates.active[player_name]
+		inmate.sentence = inmate.sentence + seconds
+	else
+		inmate = {
+			name = player_name,
+			sentence = seconds,
+			time_served = 0,
+		}
+		if confine(inmate) and revoke(inmate.name) then
+			data.inmates.active[player_name] = inmate
+			write_data_file()
+		else
+			local notice = 'Sentencing ' .. player_name .. ' failed.'
+			core.chat_send_player(judge, notice)
+			core.log('warning', notice)
+			return
+		end
+	end
+
+	core.log('action', judge .. ' sentenced ' .. inmate.name .. ' to ' ..
+		tostring(seconds) .. ' seconds in prison for ' .. cause .. '.')
+	core.chat_send_all(inmate.name ..	' has been found guilty of ' .. cause ..
+		' and has been sentenced to prison for ' .. tostring(seconds) ..
+		' seconds.')
+	local formspec = 'size[8,9]'..
+		'textarea[0.3,0.25;8,9;court;= The Court of FozLand =;'..
+		'\nYou have been tried and found you guilty of ' .. cause .. '. \n\n' ..
+		'You are hereby sentenced to prison for ' .. tostring(seconds) ..
+		' seconds. \n\nYour privileges have been reduced while you serve your ' ..
+		' sentence. Please review the rules at /news if you have any questions]'..
+		'button_exit[5.5,8.4;2.5,1;exit;I Understand]'
+	core.show_formspec(inmate.name, "Conviction", formspec)
 end
 
 function justice.discharge(judge, player_name)
@@ -378,6 +383,48 @@ core.register_chatcommand('parole', {
 			return false, 'Player ' .. player_name .. ' does not exist.'
 		end
 		justice.discharge(judge, player_name)
+	end,
+})
+
+core.register_chatcommand('records', {
+	params = '<name>',
+	description = 'Display a players criminal record.',
+	privs = {shout=true},
+	func = function(player, param)
+		local player_name = string.match(param, '^([^ ]+)$')
+		if not player_name then
+			return false, 'Invalid parameters (see /help records)'
+		elseif not core.auth_table[player_name] then
+			return false, 'Player ' .. player_name .. ' does not exist.'
+		end
+		local list = 'Criminal records for ' .. player_name .. ':\n'
+		if data.records[player_name] then
+			list = list .. string.format('%22s %9s %6s  %s\n',
+				'Date', 'Judge', 'Length', 'Reason')
+			for i, record in ipairs(data.records[player_name]) do
+				list = list .. string.format('%22s %9s %3s (s) %s\n',
+					record.date, record.judge, record.duration, record.cause)
+			end
+			core.chat_send_player(player, list)
+		else
+			core.chat_send_player(player, player_name .. ' has no criminal record.')
+		end
+	end,
+})
+
+core.register_chatcommand('inmates', {
+	description = 'Lists the active inmates.',
+	privs = {shout=true},
+	func = function(player)
+		local list = 'Currently active (logged-in) inmates:\n'
+		list = list .. string.format('%4s %15s %11s\n',
+				'Cell', 'Player Name', 'Time Served')
+		
+		for name, inmate in pairs(data.inmates.active) do
+		list = list .. string.format('%4s %15s %3d/%3d (s)\n',
+			inmate.cell_number, inmate.name, inmate.time_served, inmate.sentence)
+		end
+		core.chat_send_player(player, list)
 	end,
 })
 
@@ -460,7 +507,8 @@ core.register_globalstep(function(dtime)
 			local p1 = cells[inmate.cell_number].pos
 			local p2 = player:getpos()
 			if vector.distance(p1,p2) > 5 then
-				inmate.sentence = 2 * inmate.sentence
+				justice.sentence('The court', name, inmate.sentence,
+					 'attempting to escape from prison')
 				player:setpos(p1)
 			end
 
