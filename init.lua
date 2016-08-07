@@ -49,6 +49,7 @@ local hud_def = {
 	offset = {x=0, y=0},
 }
 
+local MAX_SENTENCE = 900 -- 15 minutes
 
 ---------------------
 -- Data Management --
@@ -276,6 +277,8 @@ end
 justice = {}
 
 function justice.sentence(judge, player_name, seconds, cause)
+	seconds = math.min(seconds, MAX_SENTENCE)
+
 	-- Update the players criminal record.
 	local record = {
 		date = os.date('%Y-%m-%d %X'),
@@ -292,7 +295,7 @@ function justice.sentence(judge, player_name, seconds, cause)
 	local inmate = {}
 	if data.inmates.active[player_name] then
 		inmate = data.inmates.active[player_name]
-		inmate.sentence = inmate.sentence + seconds
+		inmate.sentence = math.min(inmate.sentence + seconds, MAX_SENTENCE)
 	else
 		inmate = {
 			name = player_name,
@@ -454,7 +457,7 @@ core.register_on_respawnplayer(function(player)
 		local cell = cells[inmate.cell_number]
 		player:setpos(cell.pos)
 	end
-	return true -- Disable regular player placement.
+	--return true -- Disable regular player placement.
 end)
 
 -- Move inmate players who log out, to the inactive inmates table.
