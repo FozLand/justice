@@ -439,8 +439,9 @@ core.register_chatcommand('inmates', {
 -- Detect unsanctioned violence and punish the perpetrators.
 core.register_on_punchplayer(
 	function(victim, hitter, time_from_last_punch, tool_capabilities, dir, damage)
-		if in_safe_zone(victim:getpos()) then
-			if damage >= victim:get_hp() then
+		local hp = victim:get_hp()
+		if hp > 0 and in_safe_zone(victim:getpos()) then
+			if damage >= hp then
 				justice.sentence('The court', hitter:get_player_name(), 240, 'murder')
 			elseif time_from_last_punch < 2 then
 				justice.sentence('The court', hitter:get_player_name(), 30, 'assault')
