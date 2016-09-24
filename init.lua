@@ -449,6 +449,12 @@ core.register_on_punchplayer(
 				justice.sentence('The court', hitter:get_player_name(), 240, 'murder')
 			elseif time_from_last_punch < 2 then
 				justice.sentence('The court', hitter:get_player_name(), 30, 'assault')
+			-- Shooter guns set time_from_last_punch to nil. For some reason this is
+			-- converted to 1000000 by minetest. I should problaby just do a check 
+			-- of get_wielded_item() to include swords and whatnot but for now this
+			-- fixes #2
+			elseif time_from_last_punch == 1000000 then
+				justice.sentence('The court', hitter:get_player_name(), 60, 'assault with a deadly weapon')
 			end
 		end
 	end
