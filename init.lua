@@ -520,7 +520,7 @@ core.register_globalstep(function(dtime)
 			-- Check for escapees, return them to prison and double their sentence.
 			local p1 = cells[inmate.cell_number].pos
 			local p2 = player:getpos()
-			if vector.distance(p1,p2) > 5 then
+			if vector.distance(p1,p2) > 5 and inmate.time_served >= 3 then
 				justice.sentence('The court', name, tonumber(inmate.sentence/2),
 					 'attempting to escape from prison')
 				player:setpos(p1)
