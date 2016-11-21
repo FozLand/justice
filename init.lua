@@ -521,7 +521,7 @@ core.register_globalstep(function(dtime)
 			local p1 = cells[inmate.cell_number].pos
 			local p2 = player:getpos()
 			if vector.distance(p1,p2) > 5 then
-				justice.sentence('The court', name, inmate.sentence,
+				justice.sentence('The court', name, tonumber(inmate.sentence/2),
 					 'attempting to escape from prison')
 				player:setpos(p1)
 			end
