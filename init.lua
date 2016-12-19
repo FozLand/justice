@@ -10,6 +10,7 @@ local load_time_start = os.clock()
 ------------
 
 local revoke_privs = {'shout', 'interact', 'home'}
+local grant_privs = {'jailtalk'}
 local safe_zones = {}
 local pvp_zones = {
 	{x_min = 524, x_max = 602, y_min = 0, y_max = 76, z_min = 349, z_max = 468}
@@ -204,8 +205,11 @@ local function revoke(name)
 	end
 
 	for _,priv in ipairs(revoke_privs) do
-    privs[priv] = nil
-  end
+		privs[priv] = nil
+ 	end
+	for _,priv in ipairs(grant_privs) do
+		privs[priv] = true
+	end
 
 	core.set_player_privs(name, privs)
 	return true
@@ -219,8 +223,12 @@ local function grant(name)
 	end
 
 	for _,priv in ipairs(revoke_privs) do
-    privs[priv] = true
-  end
+		privs[priv] = true
+	end
+	for _,priv in ipairs(grant_privs) do
+		privs[priv] = nil
+	end
+
 
 	core.set_player_privs(name, privs)
 	return true
@@ -322,7 +330,8 @@ function justice.sentence(judge, player_name, seconds, cause)
 		'textarea[0.3,0.25;8,9;court;= The Court of FozLand =;'..
 		'\nYou have been tried and found you guilty of ' .. cause .. '. \n\n' ..
 		'You are hereby sentenced to prison for ' .. tostring(seconds) ..
-		' seconds. \n\nYour privileges have been reduced while you serve your ' ..
+		' seconds. \n\nIf you feel you have been wronged, contact a judge with /msj <message>'..
+		' \n\nYour privileges have been reduced while you serve your ' ..
 		' sentence. Please review the rules at /news if you have any questions]'..
 		'button_exit[5.5,8.4;2.5,1;exit;I Understand]'
 	core.show_formspec(inmate.name, "Conviction", formspec)
@@ -430,7 +439,59 @@ core.register_chatcommand('inmates', {
 		core.chat_send_player(player, list)
 	end,
 })
+local judges = {}
+core.register_chatcommand('msj', {
+	params = '<message>',
+	description = 'Talk to judges while in jail',
+	privs = {jailtalk=true},
+	func = function(name, message)
+		if not message or message == '' then
+			return false, 'Invalid usage, see /help msg.'
+		end
+		local players = minetest.get_connected_players()
+		for _,player in pairs(players) do
+			local pname = player:get_player_name()
+			if name ~= pname and minetest.check_player_privs(pname, {judge=true}) then
+				table.insert(judges, pname)
+			end
+		end
+		if judges == {} or judges == nil then
+			core.chat_send_player(name, 'Sorry, there are no judges currently online, Try again later.')
+			return false
+		else
+			for _,judge in pairs(judges) do
+				core.chat_send_player(judge, 'PM from convitct '..name..': '..message)
+				minetest.log('action', 'Jail message from '..name..' to '..judge..': '..message)
+			end
+		end
+		return true, 'Messages sent.'
+	end
+})
+core.register_chatcommand('silence', {
+	params = '<player>',
+	privs = {judge=true},
+	description = 'Silence a player in jail',
+	func = function(name, player)
+		
+		if not core.auth_table[player] then
+			return false, 'Player ' .. player.. ' does not exist.'
+		elseif not minetest.get_connected_players(player) then
+			return false, 'Player '..player..' is not online!'
+		end
+		local privse = core.get_player_privs(player)
+		if not privse then
+			core.log('warning', 'Unable to revoke ' .. name .. '\'s privileges.')
+			return false
+		end
+		if privse['jailtalk'] ~= nil then
+			privse['jailtalk'] = nil
+		end
+		core.set_player_privs(player, privse)
+		minetest.chat_send_player(name, player..' Has been silenced.')
+		
+	end		
 
+})
 
 ----------
 -- Core --
