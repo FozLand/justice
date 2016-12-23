@@ -460,7 +460,7 @@ core.register_chatcommand('msj', {
 			return false
 		else
 			for _,judge in pairs(judges) do
-				core.chat_send_player(judge, 'PM from convitct '..name..': '..message)
+				core.chat_send_player(judge, 'PM from convict '..name..': '..message)
 				minetest.log('action', 'Jail message from '..name..' to '..judge..': '..message)
 			end
 		end
@@ -505,7 +505,7 @@ core.register_on_punchplayer(
 		end
 
 		local hp = victim:get_hp()
-		if hp > 0 and in_safe_zone(victim:getpos()) then
+		if hp >= 0 and in_safe_zone(victim:getpos()) then
 			if damage >= hp then
 				justice.sentence('The court', hitter:get_player_name(), 240, 'murder')
 			elseif time_from_last_punch < 2 then
