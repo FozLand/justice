@@ -124,7 +124,6 @@ local function find_free_pos_near(pos)
 				local p2 = {x=i, y=j+1, z=k}
 				local n1 = core.get_node(p1)
 				local n2 = core.get_node(p2)
-				local walkable
 				if not core.registered_nodes[n1.name].walkable and
 				   not core.registered_nodes[n2.name].walkable then
 					return p1, true
@@ -302,7 +301,10 @@ function justice.sentence(judge, player_name, seconds, cause)
 			sentence = seconds,
 			time_served = 0,
 		}
-		if confine(inmate) and revoke(inmate.name) then
+		if not core.get_player_by_name(inmate.name) then
+			-- Only the last sentence for inactive players will be kept.
+			data.inmates.inactive[player_name] = inmate
+		elseif confine(inmate) and revoke(inmate.name) then
 			data.inmates.active[player_name] = inmate
 			write_data_file()
 		else
@@ -318,14 +320,6 @@ function justice.sentence(judge, player_name, seconds, cause)
 	core.chat_send_all(inmate.name ..	' has been found guilty of ' .. cause ..
 		' and has been sentenced to prison for ' .. tostring(seconds) ..
 		' seconds.')
-	local formspec = 'size[8,9]'..
-		'textarea[0.3,0.25;8,9;court;= The Court of FozLand =;'..
-		'\nYou have been tried and found you guilty of ' .. cause .. '. \n\n' ..
-		'You are hereby sentenced to prison for ' .. tostring(seconds) ..
-		' seconds. \n\nYour privileges have been reduced while you serve your ' ..
-		' sentence. Please review the rules at /news if you have any questions]'..
-		'button_exit[5.5,8.4;2.5,1;exit;I Understand]'
-	core.show_formspec(inmate.name, "Conviction", formspec)
 end
 
 function justice.discharge(judge, player_name)
@@ -494,17 +488,41 @@ core.register_on_joinplayer(function(player)
 	if data.inmates.inactive[name] then
 		-- Find an unoccupied cell for the inmate.
 		local inmate = data.inmates.inactive[name]
-		local cell_number, cell = find_free_cell()
-		inmate.cell_number = cell_number
-		cell.occupied = true
-		player:setpos(cell.pos)
-		
-		-- Move the inmate to the active list.
-		data.inmates.active[name]   = inmate
-		data.inmates.inactive[name] = nil
-		write_data_file()
+		if confine(inmate) and revoke(inmate.name) then
+			-- Move the inmate to the active list.
+			data.inmates.active[name] = inmate
+			data.inmates.inactive[name] = nil
+			write_data_file()
+		else
+			local notice = 'Sentencing ' .. player_name .. ' failed.'
+			core.log('warning', notice)
+			return
+		end
+	end
+end)
 
-		add_hud(inmate)
+local function ack_form(record)
+	local fs = 'size[8,9]'..
+	'textarea[0.3,0.25;8,9;court;= The Court of FozLand =;'..
+	'\nYou have been tried and found you guilty of '..record.cause..'. \n\n'..
+	'You are hereby sentenced to prison for '..tostring(record.duration)..
+	' seconds. \n\nYour privileges have been reduced while you serve your '..
+	' sentence. Please review the rules at /news if you have any questions]'..
+	'button_exit[5.5,8.4;2.5,1;ack;I Understand]'
+	return fs
+end
+
+core.register_on_player_receive_fields(function(player, formname, fields)
+	if formname ~= 'justice:ack' then return end
+
+	local records = data.records[player:get_player_name()]
+	local record = records[#records]
+	if record and fields then
+		if fields.ack then
+			record.ack = true
+		else
+			record.ack = false
+		end
 	end
 end)
 
@@ -526,6 +544,12 @@ core.register_globalstep(function(dtime)
 				player:setpos(p1)
 			end
 
+			local records = data.records[name]
+			local record = records[#records]
+			if not record.ack then
+				core.show_formspec(name, 'justice:ack', ack_form(record))
+				record.ack = true -- Temporarily set to true.
+			end
 			-- Check for inmates with completed sentences and discharge them.
 			inmate.time_served = inmate.time_served + time
 			if inmate.time_served >= inmate.sentence then
@@ -545,7 +569,6 @@ core.register_globalstep(function(dtime)
 		--]]
 	end
 end)
-
 
 core.log(
 	'action',
