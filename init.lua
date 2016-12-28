@@ -86,6 +86,9 @@ data.inmates = data.inmates or {}
 data.inmates.active   = data.inmates.active   or {}
 data.inmates.inactive = data.inmates.inactive or {}
 
+-- List of players recently respawned who will briefly take no damage.
+local mercy = {}
+
 -- There are no logged in players when the server starts, so deactivate all
 -- inmates when the server first starts up. This should be been handled during
 -- shutdown, but the server may have not have stopped gracefully.
@@ -433,9 +436,9 @@ core.register_chatcommand('inmates', {
 -- Detect unsanctioned violence and punish the perpetrators.
 core.register_on_punchplayer(
 	function(victim, hitter, time_from_last_punch, tool_capabilities, dir, damage)
-		if victim == hitter then
-			return
-		end
+		if victim == hitter then return end
+
+		if mercy[victim:get_player_name()] then return true end
 
 		local hp = victim:get_hp()
 		if hp > 0 and in_safe_zone(victim:getpos()) then
@@ -462,6 +465,9 @@ core.register_on_respawnplayer(function(player)
 		local cell = cells[inmate.cell_number]
 		player:setpos(cell.pos)
 	end
+	-- Protect the player from damage for a moment after respawn.
+	mercy[name] = true
+	minetest.after(1,function(n) mercy[n] = nil end, name)
 	--return true -- Disable regular player placement.
 end)
 
