@@ -294,7 +294,7 @@ function justice.sentence(judge, player_name, seconds, cause)
 	table.insert(data.records[player_name], record)
 
 	-- Update the players sentence, confine and revoke as necessary.
-	local inmate = {}
+	local inmate
 	if data.inmates.active[player_name] then
 		inmate = data.inmates.active[player_name]
 		inmate.sentence = math.min(inmate.sentence + seconds, MAX_SENTENCE)
@@ -401,7 +401,7 @@ core.register_chatcommand('records', {
 		if data.records[player_name] then
 			list = list .. string.format('%22s %9s %6s  %s\n',
 				'Date', 'Judge', 'Length', 'Reason')
-			for i, record in ipairs(data.records[player_name]) do
+			for _, record in ipairs(data.records[player_name]) do
 				list = list .. string.format('%22s %9s %3s (s) %s\n',
 					record.date, record.judge, record.duration, record.cause)
 			end
@@ -419,8 +419,8 @@ core.register_chatcommand('inmates', {
 		local list = 'Currently active (logged-in) inmates:\n'
 		list = list .. string.format('%4s %15s %11s\n',
 				'Cell', 'Player Name', 'Time Served')
-		
-		for name, inmate in pairs(data.inmates.active) do
+
+		for _, inmate in pairs(data.inmates.active) do
 		list = list .. string.format('%4s %15s %3d/%3d (s)\n',
 			inmate.cell_number, inmate.name, inmate.time_served, inmate.sentence)
 		end
@@ -447,7 +447,7 @@ core.register_on_punchplayer(
 			elseif time_from_last_punch < 2 then
 				justice.sentence('The court', hitter:get_player_name(), 30, 'assault')
 			-- Shooter guns set time_from_last_punch to nil. For some reason this is
-			-- converted to 1000000 by minetest. I should problaby just do a check 
+			-- converted to 1000000 by minetest. I should problaby just do a check
 			-- of get_wielded_item() to include swords and whatnot but for now this
 			-- fixes #2
 			elseif time_from_last_punch == 1000000 then
@@ -500,7 +500,7 @@ core.register_on_joinplayer(function(player)
 			data.inmates.inactive[name] = nil
 			write_data_file()
 		else
-			local notice = 'Sentencing ' .. player_name .. ' failed.'
+			local notice = 'Sentencing ' .. name .. ' failed.'
 			core.log('warning', notice)
 			return
 		end
@@ -534,7 +534,6 @@ end)
 
 -- Track time served for active (logged-in) inmates.
 local time = 0
-local count = 0
 core.register_globalstep(function(dtime)
 	time = time + dtime
 	if time > 1 then -- about every second
@@ -565,14 +564,6 @@ core.register_globalstep(function(dtime)
 			end
 		end
 		time = 0
-
-		--[[
-		-- save data every 5 minutes in case of a server crash
-		count = count + 1
-		if count > 300 then
-			write_data_file()
-		end
-		--]]
 	end
 end)
 
