@@ -239,7 +239,8 @@ local function confine(inmate)
 	local cell_number, cell = find_free_cell()
 	inmate.cell_number = cell_number
 	cell.occupied = true
-	player:setpos(cell.pos)
+	player:set_detach()
+	core.after(0, player.set_pos, player, cell.pos)
 
 	add_hud(inmate)
 
@@ -260,7 +261,7 @@ local function release(inmate)
 	end
 
 	cells[inmate.cell_number].occupied = false
-	player:setpos(find_free_pos_near(release_pos))
+	player:set_pos(find_free_pos_near(release_pos))
 
 	drop_hud(inmate)
 
@@ -441,7 +442,7 @@ core.register_on_punchplayer(
 		if mercy[victim:get_player_name()] then return true end
 
 		local hp = victim:get_hp()
-		if hp > 0 and in_safe_zone(victim:getpos()) then
+		if hp > 0 and in_safe_zone(victim:get_pos()) then
 			if damage >= hp then
 				justice.sentence('The court', hitter:get_player_name(), 240, 'murder')
 			elseif time_from_last_punch < 2 then
@@ -463,7 +464,7 @@ core.register_on_respawnplayer(function(player)
 	if data.inmates.active[name] then
 		local inmate = data.inmates.active[name]
 		local cell = cells[inmate.cell_number]
-		player:setpos(cell.pos)
+		player:set_pos(cell.pos)
 	end
 	-- Protect the player from damage for a moment after respawn.
 	mercy[name] = true
@@ -542,11 +543,15 @@ core.register_globalstep(function(dtime)
 
 			-- Check for escapees, return them to prison and double their sentence.
 			local p1 = cells[inmate.cell_number].pos
-			local p2 = player:getpos()
-			if vector.distance(p1,p2) > 5 and inmate.time_served >= 3 then
+			local p2 = player:get_pos()
+			if vector.distance(p1,p2) > 5 and inmate.time_served >= 10 then
 				justice.sentence('The court', name, tonumber(inmate.sentence/2),
 					 'attempting to escape from prison')
-				player:setpos(p1)
+				core.log('action', 'Escaped inmate found at '..
+					minetest.pos_to_string(p2, 0))
+				inmate.time_served = 0
+				player:set_detach()
+				core.after(0, player.set_pos, player, p1)
 			end
 
 			local records = data.records[name]
