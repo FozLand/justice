@@ -540,32 +540,33 @@ core.register_globalstep(function(dtime)
 	if time > 1 then -- about every second
 		for name, inmate in pairs(data.inmates.active) do
 			local player = core.get_player_by_name(name)
+			if player then
+				-- Check for escapees, return them to prison and double their sentence.
+				local p1 = cells[inmate.cell_number].pos
+				local p2 = player:get_pos()
+				if vector.distance(p1,p2) > 5 and inmate.time_served >= 10 then
+					justice.sentence('The court', name, tonumber(inmate.sentence/2),
+						 'attempting to escape from prison')
+					core.log('action', 'Escaped inmate found at '..
+						minetest.pos_to_string(p2, 0))
+					inmate.time_served = 0
+					player:set_detach()
+					core.after(0, player.set_pos, player, p1)
+				end
 
-			-- Check for escapees, return them to prison and double their sentence.
-			local p1 = cells[inmate.cell_number].pos
-			local p2 = player:get_pos()
-			if vector.distance(p1,p2) > 5 and inmate.time_served >= 10 then
-				justice.sentence('The court', name, tonumber(inmate.sentence/2),
-					 'attempting to escape from prison')
-				core.log('action', 'Escaped inmate found at '..
-					minetest.pos_to_string(p2, 0))
-				inmate.time_served = 0
-				player:set_detach()
-				core.after(0, player.set_pos, player, p1)
-			end
-
-			local records = data.records[name]
-			local record = records[#records]
-			if not record.ack then
-				core.show_formspec(name, 'justice:ack', ack_form(record))
-				record.ack = true -- Temporarily set to true.
-			end
-			-- Check for inmates with completed sentences and discharge them.
-			inmate.time_served = inmate.time_served + time
-			if inmate.time_served >= inmate.sentence then
-				justice.discharge('The court', name)
-			else -- Update the HUD timer.
-				update_hud(inmate)
+				local records = data.records[name]
+				local record = records[#records]
+				if not record.ack then
+					core.show_formspec(name, 'justice:ack', ack_form(record))
+					record.ack = true -- Temporarily set to true.
+				end
+				-- Check for inmates with completed sentences and discharge them.
+				inmate.time_served = inmate.time_served + time
+				if inmate.time_served >= inmate.sentence then
+					justice.discharge('The court', name)
+				else -- Update the HUD timer.
+					update_hud(inmate)
+				end
 			end
 		end
 		time = 0
